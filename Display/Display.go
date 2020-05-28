@@ -1,7 +1,7 @@
-package main
+package display
 
 /* 
-Developed by Øyvind Reppen Lunde, May 2020.
+This module creates and displays the game, with its components and status
 */
 
 import (
@@ -12,6 +12,7 @@ import (
 	"log"
 	"math"
 	"strconv"
+	"time"
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/imageutil"
@@ -23,6 +24,8 @@ import (
 	"golang.org/x/mobile/event/size"
 	"golang.org/x/mobile/event/mouse"
 	"golang.org/x/mobile/event/key"
+
+	"../game"
 )
 
 var (
@@ -44,10 +47,11 @@ var gameBoardX0 = 150 						// "Start" position of Button Panel (x and y coordin
 var gameBoardY0 = 70
 var gameBoardWidth = 240                    // Width of Button Panel
 var gameBoardHeight = 240                   // Height of Button Panel
-var TileSizeX = gameBoardWidth / numCols 	// Width of button in the Button Panel
-var TileSizeY = gameBoardHeight / numRows  	// Height of button in the Button Panel
+var tileSizeX = gameBoardWidth / numCols 	// Width of button in the Button Panel
+var tileSizeY = gameBoardHeight / numRows  	// Height of button in the Button Panel
 
-func main() {
+
+func DisplayGame(TileClicked chan game.Position, ResetChannel chan bool) {
 	driver.Main(func(s screen.Screen) {
 		// Create a window of desired size
 		w, err := s.NewWindow(&screen.NewWindowOptions{ 
@@ -61,12 +65,12 @@ func main() {
 		fmt.Println("Let's play Tic Tac Toe")
 		defer w.Release()
 
-		initializeGameBoardMatrix()
+		go updateDisplay(w) 
 
 		// Static components
 		gameBoardShape := createEmptyGameBoard(s)
-		noughtShape := createNought(s, TileSizeX, TileSizeY, red, white)
-		crossShape := createCross(s, TileSizeX, TileSizeY, blue1, white)
+		noughtShape := createNought(s, tileSizeX, tileSizeY, red, white)
+		crossShape := createCross(s, tileSizeX, tileSizeY, blue1, white)
 
 		var sz size.Event
 		for {
@@ -84,14 +88,12 @@ func main() {
 			case mouse.Event:
 				if e.Button == mouse.ButtonLeft && e.Direction == mouse.DirPress {
 					row, col := findClickedTile(int(e.X), int(e.Y))
-					executePlayerTurn(w, row, col)
+					TileClicked <- game.Position{Row: row, Col: col}
 				}
 
 			case key.Event:
 				if e.Code == key.CodeR && e.Direction == key.DirPress {
-					if winner != -1 || checkForDraw() {
-						resetGame(w)
-					}
+					ResetChannel <- true
 				}
 
 			case error:
@@ -101,43 +103,15 @@ func main() {
 	})
 }
 
-type Tile struct {
-	xMin      int
-	xMax 	  int
-	yMin      int
-	yMax 	  int
-	status 	  TileStatus
-}
-
-type TileStatus int
-
-const (
-	inactive TileStatus    = -1
-	nought                 = 1
-	cross                  = 2
-)
-
-var gameBoardMatrix [numRows][numCols]Tile
-var currentPlayer = 1
-var winner = -1
-
-func initializeGameBoardMatrix() {
-	for row := 0; row < numRows; row++ {
-		for col := 0; col < numCols; col++ {
-			gameBoardMatrix[row][col].xMin = row*TileSizeX + 1
-			gameBoardMatrix[row][col].xMax = (row+1)*TileSizeX - 1
-			gameBoardMatrix[row][col].yMin = col*TileSizeY + 1
-			gameBoardMatrix[row][col].yMax = (col+1)*TileSizeY - 1
-			gameBoardMatrix[row][col].status = inactive
+// Generate a paint event if the game board og game status has changed
+func updateDisplay(w screen.EventDeque) {
+	for {
+		time.Sleep(20 * time.Millisecond)
+		if game.UpdateDisplay {
+			w.Send(paint.Event{})
+			game.UpdateDisplay = false
 		}
 	}
-}
-
-func resetGame(w screen.EventDeque) {
-	winner = -1
-	//changeCurrentPlayer()
-	initializeGameBoardMatrix()
-	w.Send(paint.Event{})
 }
 
 func findClickedTile(x int, y int) (int, int) {
@@ -145,8 +119,8 @@ func findClickedTile(x int, y int) (int, int) {
 	yAdjusted := y - gameBoardY0
 	for row := 0; row < numRows; row++ {
 		for col := 0; col < numCols; col++ {
-			if xAdjusted >= gameBoardMatrix[row][col].xMin && xAdjusted <= gameBoardMatrix[row][col].xMax {
-				if yAdjusted >= gameBoardMatrix[row][col].yMin && yAdjusted <= gameBoardMatrix[row][col].yMax {
+			if xAdjusted >= game.GameBoardMatrix[row][col].XMin && xAdjusted <= game.GameBoardMatrix[row][col].XMax {
+				if yAdjusted >= game.GameBoardMatrix[row][col].YMin && yAdjusted <= game.GameBoardMatrix[row][col].YMax {
 					return row, col
 				}
 			}
@@ -156,93 +130,24 @@ func findClickedTile(x int, y int) (int, int) {
 	return -1, -1
 }
 
-func executePlayerTurn(w screen.EventDeque, row int, col int) {
-	if winner != -1 {
-		return
-	} 
-
-	if row == -1 || col == -1 || gameBoardMatrix[row][col].status != inactive {
-		fmt.Println("Invalid move, please click on an empty tile")
-		return
-	} else {
-		gameBoardMatrix[row][col].status = TileStatus(currentPlayer)
-		changeCurrentPlayer()
-		winner = int(checkForVictory())
-		if winner != -1 {
-			fmt.Println("Player " + strconv.Itoa(winner) + " has won!")
-		} else if checkForDraw() {
-			fmt.Println("Game ended in a draw")
-		}
-		w.Send(paint.Event{})
-	}
-
-}
-
-func changeCurrentPlayer() {
-	if currentPlayer == 1 {
-		currentPlayer = 2
-	} else {
-		currentPlayer = 1
-	}
-}
-
-func checkForVictory() TileStatus {
-	for row := 0; row < numRows; row++ {
-		if gameBoardMatrix[row][0].status == gameBoardMatrix[row][1].status && gameBoardMatrix[row][0].status == gameBoardMatrix[row][2].status && gameBoardMatrix[row][0].status != -1 {
-			return gameBoardMatrix[row][0].status
-		}
-	}
-
-	for col := 0; col < numCols; col++ {
-		if gameBoardMatrix[0][col].status == gameBoardMatrix[1][col].status && gameBoardMatrix[0][col].status == gameBoardMatrix[2][col].status && gameBoardMatrix[0][col].status != -1 {
-			return gameBoardMatrix[0][col].status
-		}
-	}
-
-	if gameBoardMatrix[0][0].status == gameBoardMatrix[1][1].status && gameBoardMatrix[0][0].status == gameBoardMatrix[2][2].status && gameBoardMatrix[0][0].status != -1 {
-		return gameBoardMatrix[0][0].status
-	}
-
-	if gameBoardMatrix[0][2].status == gameBoardMatrix[1][1].status && gameBoardMatrix[0][2].status == gameBoardMatrix[2][0].status && gameBoardMatrix[0][2].status != -1 {
-		return gameBoardMatrix[0][2].status
-	}
-
-	return -1
-}
-
-func checkForDraw() bool {
-	if winner != -1 {
-		return false
-	}
-
-	for row := 0; row < numRows; row++ {
-		for col := 0; col < numCols; col++ {
-			if gameBoardMatrix[row][col].status == -1 {
-				return false
-			}
-		}
-	}
-	return true
-}
-
 func drawGameStatusInfo(w screen.Window, s screen.Screen) {
 	player1Info := drawText(s, "Player 1 is naughts (O)", 200, 20) 
 	player2Info := drawText(s, "Player 2 is crosses (X)", 200, 20)
-	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*TileSizeY+10}, player1Info, player1Info.Bounds(), screen.Src, nil)
-	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*TileSizeY+30}, player2Info, player2Info.Bounds(), screen.Src, nil)
+	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+10}, player1Info, player1Info.Bounds(), screen.Src, nil)
+	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+30}, player2Info, player2Info.Bounds(), screen.Src, nil)
 
-	if winner != -1 {
-		winnerInfo := drawText(s, "Player " + strconv.Itoa(winner) + " has won!", 200, 20) 
+	if game.Winner != -1 {
+		winnerInfo := drawText(s, "Player " + strconv.Itoa(game.Winner) + " has won!", 200, 20) 
 		restartInfo := drawText(s, "Press 'R' to restart", 200, 20)
 		w.Copy(image.Point{gameBoardX0, gameBoardY0-50}, winnerInfo, winnerInfo.Bounds(), screen.Src, nil)
 		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, restartInfo, restartInfo.Bounds(), screen.Src, nil)
-	} else if checkForDraw() {
+	} else if game.CheckForDraw() {
 		drawInfo := drawText(s, "Game ended in a draw", 200, 20) 
 		restartInfo := drawText(s, "Press 'R' to restart", 200, 20)
 		w.Copy(image.Point{gameBoardX0, gameBoardY0-50}, drawInfo, drawInfo.Bounds(), screen.Src, nil)
 		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, restartInfo, restartInfo.Bounds(), screen.Src, nil)
 	} else {
-		info := drawText(s, "It's player " + strconv.Itoa(currentPlayer) + "'s turn", 200, 20)
+		info := drawText(s, "It's player " + strconv.Itoa(game.CurrentPlayer) + "'s turn", 200, 20)
 		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, info, info.Bounds(), screen.Src, nil)
 	}
 }
@@ -324,10 +229,10 @@ func drawGameBoard(w screen.Window, gameBoard screen.Texture, noughtShape screen
 
 	for row := 0; row < numRows; row++ {
 		for col := 0; col < numCols; col++ {
-			if gameBoardMatrix[row][col].status == nought {
-				drawNought(w, noughtShape, gameBoardX0 + row*TileSizeX, gameBoardY0 + col*TileSizeY)
-			} else if gameBoardMatrix[row][col].status == cross {
-				drawNought(w, crossShape, gameBoardX0 + row*TileSizeX, gameBoardY0 + col*TileSizeY)
+			if game.GameBoardMatrix[row][col].Status == game.Nought {
+				drawNought(w, noughtShape, gameBoardX0 + row*tileSizeX, gameBoardY0 + col*tileSizeY)
+			} else if game.GameBoardMatrix[row][col].Status == game.Cross {
+				drawNought(w, crossShape, gameBoardX0 + row*tileSizeX, gameBoardY0 + col*tileSizeY)
 			}
 		}
 	}
