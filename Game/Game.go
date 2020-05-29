@@ -29,8 +29,6 @@ type Position struct {
 const numRows = 3
 const numCols = 3
 
-var gameBoardX0 = 150 						// "Start" position of Button Panel (x and y coordinate, top left corner)
-var gameBoardY0 = 100
 var gameBoardWidth = 240                    // Width of Button Panel
 var gameBoardHeight = 240                   // Height of Button Panel
 var tileSizeX = gameBoardWidth / numCols 	// Width of button in the Button Panel
@@ -39,7 +37,6 @@ var tileSizeY = gameBoardHeight / numRows  	// Height of button in the Button Pa
 var GameBoardMatrix [numRows][numCols]Tile
 var CurrentPlayer = 1
 var Winner = -1
-var UpdateDisplay = false
 
 func initializeGameBoardMatrix() {
 	for row := 0; row < numRows; row++ {
@@ -53,16 +50,26 @@ func initializeGameBoardMatrix() {
 	}
 }
 
-func resetGame() {
-	Winner = -1
-	initializeGameBoardMatrix()
-	UpdateDisplay = true
+func resetGameBoardMatrix() {
+	for row := 0; row < numRows; row++ {
+		for col := 0; col < numCols; col++ {
+			GameBoardMatrix[row][col].Status = Inactive
+		}
+	}
 }
 
-func executePlayerTurn(row int, col int) {
+func resetGame(UpdateDisplay chan bool) {
+	Winner = -1
+	resetGameBoardMatrix()
+	UpdateDisplay <- true
+}
+
+func executePlayerTurn(row int, col int, UpdateDisplay chan bool) {
+	// Game has ended
 	if Winner != -1 || CheckForDraw() {
 		return
-	} 
+	}
+
 	// Invalid move made (clicked outside the gameBoard, or on a non-empty tile)
 	if row == -1 || col == -1 || GameBoardMatrix[row][col].Status != Inactive {
 		fmt.Println("Invalid move, please click on an empty tile")
@@ -77,8 +84,7 @@ func executePlayerTurn(row int, col int) {
 		} else if CheckForDraw() {
 			fmt.Println("Game ended in a draw")
 		}
-		// w.Send(paint.Event{})
-		UpdateDisplay = true
+		UpdateDisplay <- true
 	}
 }
 
@@ -129,19 +135,18 @@ func CheckForDraw() bool {
 	return true
 }
 
-func PlayTicTacToe(tileClicked chan Position, ResetChannel chan bool) {
+func PlayTicTacToe(tileClicked chan Position, ResetChannel chan bool, UpdateDisplay chan bool) {
 	initializeGameBoardMatrix()
 
 	for {
 		select {
 		case position := <-tileClicked:
-			executePlayerTurn(position.Row, position.Col)
+			executePlayerTurn(position.Row, position.Col, UpdateDisplay)
 
 		case <- ResetChannel:
 			if Winner != -1 || CheckForDraw() {
-				resetGame()
+				resetGame(UpdateDisplay)
 			}
 		}
 	}
-	
 }

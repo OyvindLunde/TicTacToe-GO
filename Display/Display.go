@@ -1,8 +1,6 @@
 package display
 
-/* 
-This module creates and displays the game, with its components and status
-*/
+// This module creates and displays the game, with its components, status and info
 
 import (
 	"fmt"
@@ -52,9 +50,8 @@ var tileSizeX = gameBoardWidth / numCols 	// Width of button in the Button Panel
 var tileSizeY = gameBoardHeight / numRows  	// Height of button in the Button Panel
 
 
-func DisplayGame(TileClicked chan game.Position, ResetChannel chan bool) {
+func DisplayGame(TileClicked chan game.Position, ResetChannel chan bool, UpdateDisplay chan bool) {
 	driver.Main(func(s screen.Screen) {
-		// Create a window of desired size
 		w, err := s.NewWindow(&screen.NewWindowOptions{ 
 			Width:  600,
 			Height: 500,
@@ -63,10 +60,10 @@ func DisplayGame(TileClicked chan game.Position, ResetChannel chan bool) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("Let's play Tic Tac Toe")
+		fmt.Println("Let's play Tic Tac Toe!")
 		defer w.Release()
 
-		go updateDisplay(w) 
+		go updateDisplay(w, UpdateDisplay) 
 
 		// Static components
 		gameBoardShape := createEmptyGameBoard(s)
@@ -108,20 +105,24 @@ func DisplayGame(TileClicked chan game.Position, ResetChannel chan bool) {
 	})
 }
 
-// Generate a paint event if the game board og game status has changed
-func updateDisplay(w screen.EventDeque) {
+// Generate a paint event if the game board or game status has changed
+func updateDisplay(w screen.EventDeque, UpdateDisplay chan bool) {
 	for {
 		time.Sleep(20 * time.Millisecond)
-		if game.UpdateDisplay {
+		select {
+		case <- UpdateDisplay:
 			w.Send(paint.Event{})
-			game.UpdateDisplay = false
 		}
 	}
 }
 
 func findClickedTile(x int, y int) (int, int) {
+	// Adjust (x,y) according to the position of the GameBoardMatrix, 
+	// as the Tiles X/Y Min/Max values are independent of the board's position
 	xAdjusted := x - gameBoardX0
 	yAdjusted := y - gameBoardY0
+
+	// Return the tile if the adjusted x,y values are inside the tiles bounds
 	for row := 0; row < numRows; row++ {
 		for col := 0; col < numCols; col++ {
 			if xAdjusted >= game.GameBoardMatrix[row][col].XMin && xAdjusted <= game.GameBoardMatrix[row][col].XMax {
@@ -204,7 +205,7 @@ func drawNought(w screen.Window, nought screen.Texture, xTile int, yTile int) {
 	w.Copy(image.Point{xTile+1, yTile+1}, nought, nought.Bounds(), screen.Src, nil)
 }
 
-// Nought is the Tic Tac Toe term for the circle draw on the playing board 
+// Nought is the Tic Tac Toe term for the circle drawn on the playing board 
 func createNought(s screen.Screen, width int, length int, color color.RGBA, backgroundColor color.RGBA) screen.Texture {
 	noughtRectangle := image.Point{width-2, length-2}
 	noughtBuffer, _ := s.NewBuffer(noughtRectangle)
@@ -279,18 +280,18 @@ func paintScreen(w screen.Window, sz size.Event, backgroundColor color.RGBA, bor
 // The most basic functions for drawing text and lines
 
 func drawText(s screen.Screen, text string, x_size int, y_size int) screen.Texture {
-	floor0 := image.Point{x_size, y_size}
-	f0, err := s.NewBuffer(floor0)
+	textBox := image.Point{x_size, y_size}
+	textBoxBuffer, err := s.NewBuffer(textBox)
 
-	drawRGBA(f0.RGBA(), text)
+	drawRGBA(textBoxBuffer.RGBA(), text)
 
-	f01, err := s.NewTexture(floor0)
+	textBoxTexture, err := s.NewTexture(textBox)
 	if err != nil {
 		log.Fatal(err)
 	}
-	f01.Upload(image.Point{}, f0, f0.Bounds())
-	defer f0.Release()
-	return f01
+	textBoxTexture.Upload(image.Point{}, textBoxBuffer, textBoxBuffer.Bounds())
+	defer textBoxBuffer.Release()
+	return textBoxTexture
 }
 
 func drawRGBA(m *image.RGBA, str string) {
