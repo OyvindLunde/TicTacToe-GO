@@ -133,8 +133,10 @@ func findClickedTile(x int, y int) (int, int) {
 func drawGameStatusInfo(w screen.Window, s screen.Screen) {
 	player1Info := drawText(s, "Player 1 is naughts (O)", 200, 20) 
 	player2Info := drawText(s, "Player 2 is crosses (X)", 200, 20)
+	gameInfo := drawText(s, "Click on a tile to place your marker there", 350, 20)
 	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+10}, player1Info, player1Info.Bounds(), screen.Src, nil)
 	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+30}, player2Info, player2Info.Bounds(), screen.Src, nil)
+	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+60}, gameInfo, gameInfo.Bounds(), screen.Src, nil)
 
 	if game.Winner != -1 {
 		winnerInfo := drawText(s, "Player " + strconv.Itoa(game.Winner) + " has won!", 200, 20) 

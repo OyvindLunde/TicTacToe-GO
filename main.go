@@ -1,8 +1,6 @@
 package main
 
-/* 
-Developed by Øyvind Reppen Lunde, May 2020.
-*/
+// Developed by Øyvind Reppen Lunde, May 2020.
 
 import (
 	"./game"
