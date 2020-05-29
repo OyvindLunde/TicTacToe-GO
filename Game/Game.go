@@ -30,7 +30,7 @@ const numRows = 3
 const numCols = 3
 
 var gameBoardX0 = 150 						// "Start" position of Button Panel (x and y coordinate, top left corner)
-var gameBoardY0 = 70
+var gameBoardY0 = 100
 var gameBoardWidth = 240                    // Width of Button Panel
 var gameBoardHeight = 240                   // Height of Button Panel
 var tileSizeX = gameBoardWidth / numCols 	// Width of button in the Button Panel

@@ -13,6 +13,7 @@ import (
 	"math"
 	"strconv"
 	"time"
+	"os"
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/imageutil"
@@ -44,7 +45,7 @@ const numRows = 3
 const numCols = 3
 
 var gameBoardX0 = 150 						// "Start" position of Button Panel (x and y coordinate, top left corner)
-var gameBoardY0 = 70
+var gameBoardY0 = 100
 var gameBoardWidth = 240                    // Width of Button Panel
 var gameBoardHeight = 240                   // Height of Button Panel
 var tileSizeX = gameBoardWidth / numCols 	// Width of button in the Button Panel
@@ -96,6 +97,10 @@ func DisplayGame(TileClicked chan game.Position, ResetChannel chan bool) {
 					ResetChannel <- true
 				}
 
+				if e.Code == key.CodeEscape {
+					os.Exit(3)
+				}
+
 			case error:
 				log.Print(e)
 			}
@@ -134,20 +139,22 @@ func drawGameStatusInfo(w screen.Window, s screen.Screen) {
 	player1Info := drawText(s, "Player 1 is naughts (O)", 200, 20) 
 	player2Info := drawText(s, "Player 2 is crosses (X)", 200, 20)
 	gameInfo := drawText(s, "Click on a tile to place your marker there", 350, 20)
+	restartInfo := drawText(s, "Press 'R' to restart", 200, 20)
+	exitInfo := drawText(s, "Press 'Esc' to Exit", 200, 20)
 	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+10}, player1Info, player1Info.Bounds(), screen.Src, nil)
 	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+30}, player2Info, player2Info.Bounds(), screen.Src, nil)
 	w.Copy(image.Point{gameBoardX0, gameBoardY0+numRows*tileSizeY+60}, gameInfo, gameInfo.Bounds(), screen.Src, nil)
 
 	if game.Winner != -1 {
 		winnerInfo := drawText(s, "Player " + strconv.Itoa(game.Winner) + " has won!", 200, 20) 
-		restartInfo := drawText(s, "Press 'R' to restart", 200, 20)
-		w.Copy(image.Point{gameBoardX0, gameBoardY0-50}, winnerInfo, winnerInfo.Bounds(), screen.Src, nil)
-		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, restartInfo, restartInfo.Bounds(), screen.Src, nil)
+		w.Copy(image.Point{gameBoardX0, gameBoardY0-70}, winnerInfo, winnerInfo.Bounds(), screen.Src, nil)
+		w.Copy(image.Point{gameBoardX0, gameBoardY0-50}, restartInfo, restartInfo.Bounds(), screen.Src, nil)
+		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, exitInfo, exitInfo.Bounds(), screen.Src, nil)
 	} else if game.CheckForDraw() {
 		drawInfo := drawText(s, "Game ended in a draw", 200, 20) 
-		restartInfo := drawText(s, "Press 'R' to restart", 200, 20)
-		w.Copy(image.Point{gameBoardX0, gameBoardY0-50}, drawInfo, drawInfo.Bounds(), screen.Src, nil)
-		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, restartInfo, restartInfo.Bounds(), screen.Src, nil)
+		w.Copy(image.Point{gameBoardX0, gameBoardY0-70}, drawInfo, drawInfo.Bounds(), screen.Src, nil)
+		w.Copy(image.Point{gameBoardX0, gameBoardY0-50}, restartInfo, restartInfo.Bounds(), screen.Src, nil)
+		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, exitInfo, exitInfo.Bounds(), screen.Src, nil)
 	} else {
 		info := drawText(s, "It's player " + strconv.Itoa(game.CurrentPlayer) + "'s turn", 200, 20)
 		w.Copy(image.Point{gameBoardX0, gameBoardY0-30}, info, info.Bounds(), screen.Src, nil)

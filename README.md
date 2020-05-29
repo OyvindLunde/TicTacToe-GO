@@ -7,6 +7,13 @@
 ## About the program
 The program was created with the GO programming language. The *Display* functionality was created using the *exp/shiny* libraries.
 
+### Running the program
+Before running the program, you need to install the GO programming language, as well as install the exp/shiny package. The latter can be done by running this line in the terminal:
+
+`go install golang.org/x/exp/shiny/driver`
+
+To run the program, navigate to the **TicTacToe-GO** folder in the terminal, and type `go run main.go`. The game should then start, and you are good to go. To quit the program, press `Ctrl+C` in the terminal, or `Esc` while in the game. 
+
 ## Content
 The program has 3 modules: The `Game` module handles all data and logic associated with playing the game, the `Display` module displays the game with all its components, status and information, and `main` connects these two to let the user play the game. In particular, main runs the program by running the two goroutines `DisplayGame()` and `PlayTicTacToe()`, as well as creating channels that help monitor tile clicking and reset the game.
 
